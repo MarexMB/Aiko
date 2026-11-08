@@ -1,9 +1,9 @@
-"""Original pixel-art renderer on a 40×50 grid, scaled without smoothing."""
+"""Original detailed 100×125 pixel sprite, scaled without smoothing."""
 
 import math
 import time
 
-from PySide6.QtCore import QPoint, QRect, Qt, QTimer
+from PySide6.QtCore import QPoint, QRect, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QImage, QPainter, QPolygon
 from PySide6.QtWidgets import QWidget
 
@@ -44,9 +44,10 @@ class MascotWidget(QWidget):
     def paintEvent(self, event):
         elapsed = time.monotonic() - self.started
         colors = self.profile.appearance
-        image = QImage(40, 50, QImage.Format.Format_ARGB32_Premultiplied)
+        image = QImage(100, 125, QImage.Format.Format_ARGB32_Premultiplied)
         image.fill(Qt.GlobalColor.transparent)
         sprite = QPainter(image)
+        sprite.scale(2.5, 2.5)
         sprite.setPen(Qt.PenStyle.NoPen)
         outline = "#302c47"
         hair = colors["hair"]
@@ -54,7 +55,7 @@ class MascotWidget(QWidget):
         highlight = QColor(hair).lighter(125).name()
 
         def box(x, y, w, h, color):
-            sprite.fillRect(x, y, w, h, QColor(color))
+            sprite.fillRect(QRectF(x, y, w, h), QColor(color))
 
         def shape(points, color):
             sprite.setBrush(QColor(color))
@@ -64,8 +65,13 @@ class MascotWidget(QWidget):
         # Snap movement to the sprite grid; fractional transforms blur pixel edges.
         bounce = 0
         if not self.reduced_motion:
-            bounce = round(math.sin(elapsed * 1.8) * self.profile.animation["bounce_px"] / 5)
+            speed = 5 if self.state == "happy" else 1.8
+            bounce = (
+                round(math.sin(elapsed * speed) * self.profile.animation["bounce_px"] / 2) / 2.5
+            )
         sprite.translate(0, bounce)
+        sway = 0 if self.reduced_motion else round(math.sin(elapsed * 1.3) * 2) / 2.5
+        sprite.translate(sway, 0)
 
         # Stepped hair silhouette and long side locks.
         shape(
@@ -280,6 +286,12 @@ class MascotWidget(QWidget):
         box(14, 9, 10, 1, highlight)
         box(12, 11, 5, 1, highlight)
         box(23, 11, 3, 1, highlight)
+        # Fine strands and reflected light use the expanded sprite resolution.
+        for x, y, height in ((9.2, 17, 11), (10.4, 20, 10), (29.6, 19, 10), (31.2, 18, 8)):
+            drift = 0 if self.reduced_motion else math.sin(elapsed * 2 + x) * 0.4
+            box(x + drift, y, 0.4, height, highlight)
+        for x, y, width in ((14, 8.4, 9), (12.4, 10, 4), (22, 10.4, 4)):
+            box(x, y, width, 0.4, "#fff2b0")
 
         blink = not self.reduced_motion and elapsed % self.profile.animation["blink_seconds"] < 0.16
         for x in (14, 23):
@@ -295,9 +307,35 @@ class MascotWidget(QWidget):
                 box(x, 20, 1, 2, "#ffffff")
                 box(x + 1, 20, 1, 2, "#174d89")
                 box(x + 1, 23, 2, 1, "#78d9ff")
+                box(x + 2, 20.4, 0.4, 2, "#65bbff")
+                box(x + 1.6, 22.4, 0.8, 0.4, "#d5f6ff")
+                box(x - 0.4, 19.2, 0.4, 1.2, outline)
         box(12, 24, 3, 1, "#ed9ea9")
         box(25, 24, 2, 1, "#ed9ea9")
         box(19, 25, 2, 1, "#aa646e")
+        box(19.4, 25, 1.2, 0.4, "#fff1e4")
+        for x in (12.4, 25):
+            box(x, 24.4, 1.6, 0.4, "#ffc3c5")
+        # Embroidered hem, sleeve cuffs and tiny boot highlights.
+        for x in range(14, 26, 3):
+            box(x, 38, 0.4, 0.4, "#e8dcff")
+        box(12, 34.4, 2, 0.4, "#fff5ff")
+        box(26, 34.4, 2, 0.4, "#fff5ff")
+        box(14, 45.4, 2.4, 0.4, "#fff5ff")
+        box(23, 45.4, 2.4, 0.4, "#fff5ff")
+        # Brief greeting gesture every twelve seconds, or a cheerful reaction.
+        wave = not self.reduced_motion and (elapsed % 12 > 9.5 or self.state == "happy")
+        if wave:
+            hand_y = 29 + round(math.sin(elapsed * 7)) * 0.4
+            box(28, 32, 2.4, 3.2, outline)
+            box(28.4, 32, 1.6, 2.8, colors["accent"])
+            box(29.2, hand_y, 2.8, 3.6, outline)
+            box(29.6, hand_y + 0.4, 2, 2.8, colors["skin"])
+            box(30, hand_y - 0.8, 0.8, 1.6, colors["skin"])
+        if self.state == "happy":
+            for x, y in ((5, 9), (34, 23)):
+                box(x, y, 0.4, 2.4, "#fff1a4")
+                box(x - 0.8, y + 0.8, 2, 0.4, "#fff1a4")
 
         # Blue pixel star: a small accent against the yellow hair.
         shape(
@@ -326,12 +364,12 @@ class MascotWidget(QWidget):
 
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-        scale = max(1, min(self.width() // 40, self.height() // 50))
+        scale = max(1, min(self.width() // 100, self.height() // 125))
         target = QRect(
-            (self.width() - 40 * scale) // 2,
-            (self.height() - 50 * scale) // 2,
-            40 * scale,
-            50 * scale,
+            (self.width() - 100 * scale) // 2,
+            (self.height() - 125 * scale) // 2,
+            100 * scale,
+            125 * scale,
         )
         p.drawImage(target, image)
         p.end()
