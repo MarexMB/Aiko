@@ -7,7 +7,7 @@ name = "aiko-desktop"
 version = "0.1.0"
 description = "A local-first desktop companion powered by Ollama"
 requires-python = ">=3.11,<3.15"
-dependencies = ["PySide6>=6.8.3,<6.12", "httpx>=0.28.1,<0.29"]
+dependencies = ["PySide6>=6.8.3,<6.13", "httpx>=0.28.1,<0.29"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3,<10", "ruff>=0.11,<1"]
