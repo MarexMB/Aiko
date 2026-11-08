@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 from collections.abc import Callable
+from datetime import datetime
 
 import httpx
 
@@ -75,7 +76,8 @@ class OllamaClient:
                         f"Ollama reachable; model missing. Run explicitly: ollama pull {wanted}"
                     )
                 await self._inspect_local(client)
-                return f"Local Ollama reachable · {wanted} installed (checked now)"
+                checked = datetime.now().strftime("%H:%M:%S")
+                return f"Local Ollama reachable · {wanted} installed (checked {checked})"
         except httpx.TimeoutException as exc:
             raise OllamaError("Ollama check timed out. Check the local server and retry.") from exc
         except httpx.RequestError as exc:

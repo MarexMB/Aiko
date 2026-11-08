@@ -99,6 +99,21 @@ def test_remote_alias_blocked_before_sending_messages():
     assert paths == ["/api/show"]
 
 
+def test_timeout_and_oversized_response():
+    def timeout(request):
+        raise httpx.ReadTimeout("private body", request=request)
+
+    with pytest.raises(OllamaError, match="timed out"):
+        asyncio.run(OllamaClient(Settings(), local_transport(timeout)).chat([]))
+    body = json.dumps({"message": {"content": "a" * 32001}, "done": True}).encode() + b"\n"
+    with pytest.raises(OllamaError, match="32,000"):
+        asyncio.run(
+            OllamaClient(
+                Settings(), local_transport(lambda r: httpx.Response(200, content=body))
+            ).chat([])
+        )
+
+
 def test_context_budget():
     profile = CharacterManager().current()
     history = [{"role": role, "content": "z" * 600} for role in ["user", "assistant"] * 10]

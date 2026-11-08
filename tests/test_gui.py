@@ -48,6 +48,31 @@ def test_controller_history_and_settings(app, tmp_path):
     db.close()
 
 
+def test_large_history_pages_have_no_gaps(app, tmp_path):
+    db = Database(tmp_path / "pages.sqlite3")
+    controller = Controller(app, db)
+    for i in range(9):
+        db.add_message(controller.session_id, "assistant", str(i) + "x" * 31999)
+    controller.refresh()
+    assert controller.page_first == 7
+    controller.older()
+    assert controller.page_first == 4
+    controller.older()
+    assert controller.page_first == 1
+    controller.older()
+    assert controller.page_first == 7
+    controller.confirm = lambda text: False
+    controller.clear_history()
+    assert len(db.messages(controller.session_id)) == 9
+    controller.confirm = lambda text: True
+    controller.clear_history()
+    assert db.messages(controller.session_id) == []
+    assert len(db.sessions("aiko")) == 1
+    controller.chat.deleteLater()
+    controller.mascot.deleteLater()
+    db.close()
+
+
 def test_mascot_bounds_motion_and_click(app):
     from PySide6.QtCore import QPoint, QRect, QSize
 

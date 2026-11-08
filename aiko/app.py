@@ -2,6 +2,7 @@ import logging
 import sqlite3
 import sys
 from dataclasses import replace
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
 from PySide6.QtCore import QObject, QTimer, Slot
@@ -149,7 +150,8 @@ class Controller(QObject):
             self.db.add_message(self.session_id, "assistant", text)
             self.page_before = None
             self.refresh()
-            self.chat.status.setText("Reply received locally · connection last used just now")
+            received = datetime.now().strftime("%H:%M:%S")
+            self.chat.status.setText(f"Reply received locally · last response {received}")
         except sqlite3.Error:
             self.chat.show_messages(
                 [*self.db.messages(self.session_id, 19), {"role": "assistant", "content": text}]
