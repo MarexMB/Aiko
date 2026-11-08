@@ -44,4 +44,28 @@ def test_controller_history_and_settings(app, tmp_path):
     controller.open_chat(first)
     assert "Zdravo" in controller.chat.transcript.toPlainText()
     controller.chat.deleteLater()
+    controller.mascot.deleteLater()
     db.close()
+
+
+def test_mascot_bounds_motion_and_click(app):
+    from PySide6.QtCore import QPoint, QRect, QSize
+
+    from aiko.characters.profile import CharacterManager
+    from aiko.config import Settings
+    from aiko.ui.mascot_window import MascotWindow, clamp_position
+
+    assert clamp_position(QPoint(9000, -500), QSize(200, 250), [QRect(0, 0, 1920, 1080)]) == QPoint(
+        1720, 0
+    )
+    mascot = MascotWindow(CharacterManager().current(), Settings(reduced_motion=True))
+    assert not mascot.character.timer.isActive()
+    clicked = []
+    mascot.toggle_chat.connect(lambda: clicked.append(True))
+    QTest.mouseClick(mascot, Qt.MouseButton.LeftButton)
+    assert clicked == [True]
+    mascot.character.set_state("thinking")
+    assert not mascot.grab().isNull()
+    mascot.character.set_state("happy")
+    assert not mascot.grab().isNull()
+    mascot.deleteLater()

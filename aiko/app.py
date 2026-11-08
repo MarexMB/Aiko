@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 import sys
+from dataclasses import replace
 from logging.handlers import RotatingFileHandler
 
 from PySide6.QtCore import QObject, QTimer, Slot
@@ -11,6 +12,7 @@ from aiko.characters.profile import CharacterManager
 from aiko.config import Settings, data_dir
 from aiko.memory.database import Database
 from aiko.ui.chat_window import STYLE, ChatWindow
+from aiko.ui.mascot_window import MascotWindow
 from aiko.ui.settings_dialog import SettingsDialog
 from aiko.ui.worker import InferenceWorker
 
@@ -49,7 +51,29 @@ class Controller(QObject):
         self.chat.settings_requested.connect(self.edit_settings)
         self.chat.quit_requested.connect(self.quit)
         self.chat.older_requested.connect(self.older)
+        self.mascot = MascotWindow(self.profile, self.settings)
+        self.mascot.toggle_chat.connect(self.toggle_chat)
+        self.mascot.open_chat.connect(self.show_chat)
+        self.mascot.settings_requested.connect(self.edit_settings)
+        self.mascot.quit_requested.connect(self.quit)
+        self.mascot.position_changed.connect(self.save_position)
         self.refresh()
+
+    def show_chat(self):
+        self.chat.showNormal()
+        self.chat.raise_()
+        self.chat.activateWindow()
+        self.chat.input.setFocus()
+
+    def toggle_chat(self):
+        if self.chat.isVisible():
+            self.chat.hide()
+        else:
+            self.show_chat()
+
+    def save_position(self, x: int, y: int):
+        self.settings = replace(self.settings, mascot_x=x, mascot_y=y)
+        self.db.save_settings(self.settings)
 
     def refresh(self):
         self.chat.set_sessions(self.db.sessions(self.profile.id), self.session_id)
@@ -93,6 +117,7 @@ class Controller(QObject):
         if self.worker or self.quitting:
             return
         self.chat.set_busy(True)
+        self.mascot.character.set_state("thinking")
         self.chat.status.setText(
             "Thinking locally…" if messages is not None else "Checking local Ollama…"
         )
@@ -110,6 +135,7 @@ class Controller(QObject):
         if self.worker.messages is None:
             self.chat.status.setText(text)
             return
+        self.mascot.character.set_state("happy")
         try:
             self.db.add_message(self.session_id, "assistant", text)
             self.page_before = None
@@ -141,6 +167,8 @@ class Controller(QObject):
             worker.deleteLater()
         self.worker = None
         self.chat.set_busy(False)
+        if self.mascot.character.state == "thinking":
+            self.mascot.character.set_state("idle")
         if self.quitting:
             self.finish_quit()
 
@@ -204,9 +232,12 @@ class Controller(QObject):
         if dialog.exec():
             self.db.save_settings(dialog.value)
             self.settings = dialog.value
+            self.mascot.apply_settings(self.settings)
             self.chat.status.setText("Settings saved · connection not checked with these settings")
 
     def quit(self):
+        if self.quitting:
+            return
         self.quitting = True
         if self.worker:
             self.chat.status.setText("Closing connection before exiting…")
@@ -215,6 +246,10 @@ class Controller(QObject):
             self.finish_quit()
 
     def finish_quit(self):
+        self.mascot.character.timer.stop()
+        self.mascot.character.happy_timer.stop()
+        self.mascot.hide()
+        self.chat.hide()
         self.db.close()
         self.app.quit()
 
@@ -254,6 +289,6 @@ def main() -> int:
         )
 
     sys.excepthook = report_error
-    controller.chat.show()
+    controller.mascot.show()
     QTimer.singleShot(100, controller.check)
     return app.exec()
