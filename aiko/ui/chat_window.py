@@ -90,7 +90,6 @@ class ChatWindow(QMainWindow):
         self.transcript = QTextBrowser()
         self.transcript.setOpenLinks(False)
         self.transcript.setOpenExternalLinks(False)
-        self.transcript.document().setMaximumBlockCount(2000)
         layout.addWidget(self.transcript, 1)
         self.status = QLabel("Local connection not checked")
         self.status.setObjectName("status")

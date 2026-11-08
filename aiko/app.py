@@ -78,6 +78,15 @@ class Controller(QObject):
     def refresh(self):
         self.chat.set_sessions(self.db.sessions(self.profile.id), self.session_id)
         rows = self.db.messages(self.session_id, 20, self.page_before)
+        # Page by both count and size so every stored message remains accessible.
+        size = 0
+        visible = []
+        for row in reversed(rows):
+            if size + len(row["content"]) > 100_000:
+                break
+            visible.append(row)
+            size += len(row["content"])
+        rows = list(reversed(visible))
         self.page_first = rows[0]["id"] if rows else None
         has_older = bool(rows and self.db.messages(self.session_id, 1, self.page_first))
         self.chat.older.setText("Show older messages" if has_older else "Back to latest messages")

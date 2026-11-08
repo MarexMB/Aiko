@@ -69,3 +69,54 @@ def test_mascot_bounds_motion_and_click(app):
     mascot.character.set_state("happy")
     assert not mascot.grab().isNull()
     mascot.deleteLater()
+
+
+def wait_until(app, predicate, timeout=3000):
+    import time
+
+    deadline = time.monotonic() + timeout / 1000
+    while not predicate() and time.monotonic() < deadline:
+        app.processEvents()
+        QTest.qWait(10)
+    assert predicate()
+
+
+def test_async_response_and_stop(app, tmp_path, monkeypatch):
+    import asyncio
+
+    from aiko.ai.ollama_client import OllamaClient
+
+    async def delayed_reply(self, messages):
+        await asyncio.sleep(0.1)
+        return "Zdravo!"
+
+    monkeypatch.setattr(OllamaClient, "chat", delayed_reply)
+    db = Database(tmp_path / "async.sqlite3")
+    controller = Controller(app, db)
+    controller.send("Hi")
+    assert controller.worker is not None
+    assert not controller.chat.send.isEnabled()
+    controller.send("duplicate")
+    assert len(db.messages(controller.session_id)) == 1
+    wait_until(app, lambda: controller.worker is None)
+    assert db.messages(controller.session_id)[-1]["content"] == "Zdravo!"
+    assert controller.mascot.character.state == "happy"
+
+    async def stall(self, messages):
+        await asyncio.sleep(60)
+        return "must not save"
+
+    monkeypatch.setattr(OllamaClient, "chat", stall)
+    controller.send("Cancel this")
+    QTest.qWait(50)
+    controller.stop()
+    wait_until(app, lambda: controller.worker is None)
+    assert len(db.messages(controller.session_id)) == 3
+    assert "Stopped" in controller.chat.status.text()
+    assert controller.mascot.character.state == "idle"
+    controller.send("Exit during generation")
+    controller.quit()
+    wait_until(app, lambda: controller.worker is None)
+    assert not controller.mascot.character.timer.isActive()
+    controller.chat.deleteLater()
+    controller.mascot.deleteLater()

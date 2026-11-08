@@ -27,6 +27,8 @@ class Settings:
     def validate(self) -> "Settings":
         if not isinstance(self.model, str) or not re.fullmatch(r"[\w./:-]{1,120}", self.model):
             raise ValueError("Use a model name such as qwen3:8b (no spaces).")
+        if "cloud" in self.model.lower():
+            raise ValueError("Cloud model names are disabled. Choose an installed local model.")
         # Numeric loopback addresses avoid DNS resolution and remote/cloud endpoints.
         try:
             url = urlsplit(self.ollama_url)

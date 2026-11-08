@@ -10,6 +10,21 @@ from aiko.characters.profile import CharacterManager
 from aiko.config import Settings
 
 
+def local_transport(handler):
+    def route(request):
+        if request.url.path == "/api/show":
+            return httpx.Response(
+                200,
+                json={
+                    "details": {"format": "gguf"},
+                    "model_info": {"general.architecture": "qwen3"},
+                },
+            )
+        return handler(request)
+
+    return httpx.MockTransport(route)
+
+
 def test_final_only_and_request_contract():
     def handler(request):
         body = json.loads(request.content)
@@ -20,7 +35,7 @@ def test_final_only_and_request_contract():
             content=b'{"message":{"thinking":"secret","content":"<think>hidden</think>Hello"},"done":true}\n',
         )
 
-    client = OllamaClient(Settings(), httpx.MockTransport(handler))
+    client = OllamaClient(Settings(), local_transport(handler))
     assert asyncio.run(client.chat([{"role": "user", "content": "Hi"}])) == "Hello"
 
 
@@ -34,16 +49,14 @@ def test_final_only_and_request_contract():
     ],
 )
 def test_malformed_and_incomplete_streams(body):
-    client = OllamaClient(
-        Settings(), httpx.MockTransport(lambda r: httpx.Response(200, content=body))
-    )
+    client = OllamaClient(Settings(), local_transport(lambda r: httpx.Response(200, content=body)))
     with pytest.raises(OllamaError):
         asyncio.run(client.chat([]))
 
 
 @pytest.mark.parametrize("status", [400, 404, 500, 302])
 def test_server_errors_and_redirects(status):
-    client = OllamaClient(Settings(), httpx.MockTransport(lambda r: httpx.Response(status)))
+    client = OllamaClient(Settings(), local_transport(lambda r: httpx.Response(status)))
     with pytest.raises(OllamaError):
         asyncio.run(client.chat([]))
 
@@ -65,6 +78,25 @@ def test_missing_model():
 def test_reasoning_fragments():
     assert final_answer("<think>unfinished") == ""
     assert final_answer("hidden</think>Final") == "Final"
+
+
+def test_remote_alias_blocked_before_sending_messages():
+    paths = []
+
+    def handler(request):
+        paths.append(request.url.path)
+        assert "messages" not in json.loads(request.content)
+        return httpx.Response(
+            200, json={"remote_host": "https://ollama.com", "remote_model": "remote"}
+        )
+
+    with pytest.raises(OllamaError, match="remote host"):
+        asyncio.run(
+            OllamaClient(Settings(), httpx.MockTransport(handler)).chat(
+                [{"role": "user", "content": "private"}]
+            )
+        )
+    assert paths == ["/api/show"]
 
 
 def test_context_budget():

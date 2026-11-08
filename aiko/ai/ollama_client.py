@@ -49,10 +49,23 @@ class OllamaClient:
                 f"Ollama returned HTTP {response.status_code}. Check the local Ollama application."
             )
 
+    async def _inspect_local(self, client: httpx.AsyncClient) -> None:
+        # A loopback Ollama can itself route to cloud models. Verify metadata BEFORE
+        # sending any conversation, including remote aliases without ':cloud' in the name.
+        response = await client.post("/api/show", json={"model": self.settings.model}, timeout=5)
+        self._status(response)
+        data = response.json()
+        if data.get("remote_host") or data.get("remote_model"):
+            raise OllamaError("This model routes to a remote host. Aiko only permits local models.")
+        if not data.get("model_info") or data.get("details", {}).get("format") != "gguf":
+            raise OllamaError(
+                "Cannot verify local GGUF model metadata. Select an installed local model such as qwen3:8b."
+            )
+
     async def check(self) -> str:
         try:
             async with self._client() as client:
-                response = await client.get("/api/tags")
+                response = await client.get("/api/tags", timeout=5)
                 self._status(response)
                 models = response.json()["models"]
                 names = {model["name"] for model in models}
@@ -61,6 +74,7 @@ class OllamaClient:
                     raise OllamaError(
                         f"Ollama reachable; model missing. Run explicitly: ollama pull {wanted}"
                     )
+                await self._inspect_local(client)
                 return f"Local Ollama reachable · {wanted} installed (checked now)"
         except httpx.TimeoutException as exc:
             raise OllamaError("Ollama check timed out. Check the local server and retry.") from exc
@@ -68,7 +82,7 @@ class OllamaClient:
             raise OllamaError(
                 "Cannot reach local Ollama. Start Ollama from Start, or run ollama serve, then Check connection."
             ) from exc
-        except (ValueError, KeyError, TypeError) as exc:
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
             raise OllamaError(
                 "Ollama returned an invalid model list. Check its version and URL."
             ) from exc
@@ -89,6 +103,7 @@ class OllamaClient:
         try:
             async with asyncio.timeout(180):
                 async with self._client() as client:
+                    await self._inspect_local(client)
                     async with client.stream("POST", "/api/chat", json=payload) as response:
                         self._status(response)
                         buffer = b""
