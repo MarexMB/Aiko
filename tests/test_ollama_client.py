@@ -4,8 +4,8 @@ import json
 import httpx
 import pytest
 
-from aiko.ai.ollama_client import OllamaClient, OllamaError, final_answer
 from aiko.ai.conversation_service import build_context
+from aiko.ai.ollama_client import OllamaClient, OllamaError, final_answer
 from aiko.characters.profile import CharacterManager
 from aiko.config import Settings
 
@@ -15,14 +15,28 @@ def test_final_only_and_request_contract():
         body = json.loads(request.content)
         assert body["think"] is False
         assert body["options"] == {"num_ctx": 4096, "num_predict": 768}
-        return httpx.Response(200, content=b'{"message":{"thinking":"secret","content":"<think>hidden</think>Hello"},"done":true}\n')
+        return httpx.Response(
+            200,
+            content=b'{"message":{"thinking":"secret","content":"<think>hidden</think>Hello"},"done":true}\n',
+        )
+
     client = OllamaClient(Settings(), httpx.MockTransport(handler))
     assert asyncio.run(client.chat([{"role": "user", "content": "Hi"}])) == "Hello"
 
 
-@pytest.mark.parametrize("body", [b'no json\n', b'{"message":{"content":42}}\n', b'{"message":{"content":"unfinished"}}\n', b'{"error":"private server data"}\n'])
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"no json\n",
+        b'{"message":{"content":42}}\n',
+        b'{"message":{"content":"unfinished"}}\n',
+        b'{"error":"private server data"}\n',
+    ],
+)
 def test_malformed_and_incomplete_streams(body):
-    client = OllamaClient(Settings(), httpx.MockTransport(lambda r: httpx.Response(200, content=body)))
+    client = OllamaClient(
+        Settings(), httpx.MockTransport(lambda r: httpx.Response(200, content=body))
+    )
     with pytest.raises(OllamaError):
         asyncio.run(client.chat([]))
 
@@ -37,6 +51,7 @@ def test_server_errors_and_redirects(status):
 def test_connection_failure():
     def handler(request):
         raise httpx.ConnectError("private details", request=request)
+
     with pytest.raises(OllamaError, match="Cannot reach local"):
         asyncio.run(OllamaClient(Settings(), httpx.MockTransport(handler)).check())
 

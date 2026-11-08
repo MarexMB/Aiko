@@ -31,9 +31,14 @@ class Settings:
         try:
             url = urlsplit(self.ollama_url)
             valid = (
-                url.scheme == "http" and url.hostname in {"127.0.0.1", "::1"}
-                and not url.username and not url.password and url.path in {"", "/"}
-                and not url.query and not url.fragment and (url.port or 11434) > 0
+                url.scheme == "http"
+                and url.hostname in {"127.0.0.1", "::1"}
+                and not url.username
+                and not url.password
+                and url.path in {"", "/"}
+                and not url.query
+                and not url.fragment
+                and (url.port or 11434) > 0
             )
         except (ValueError, TypeError, AttributeError):
             valid = False

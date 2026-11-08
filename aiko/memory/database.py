@@ -39,9 +39,12 @@ class Database:
         return int(cursor.lastrowid)
 
     def sessions(self, character_id: str) -> list[dict]:
-        return [dict(row) for row in self.connection.execute(
-            "SELECT * FROM sessions WHERE character_id = ? ORDER BY id DESC", (character_id,)
-        )]
+        return [
+            dict(row)
+            for row in self.connection.execute(
+                "SELECT * FROM sessions WHERE character_id = ? ORDER BY id DESC", (character_id,)
+            )
+        ]
 
     def add_message(self, session_id: int, role: str, content: str) -> None:
         if role not in {"user", "assistant"} or not content.strip() or len(content) > 32000:

@@ -28,18 +28,26 @@ class OllamaClient:
 
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
-            base_url=self.settings.ollama_url.rstrip("/"), trust_env=False,
-            follow_redirects=False, timeout=httpx.Timeout(90, connect=3),
+            base_url=self.settings.ollama_url.rstrip("/"),
+            trust_env=False,
+            follow_redirects=False,
+            timeout=httpx.Timeout(90, connect=3),
             transport=self.transport,
         )
 
     def _status(self, response: httpx.Response) -> None:
         if response.status_code == 404:
-            raise OllamaError(f"Model or endpoint missing. Check ollama list; if needed, run: ollama pull {self.settings.model}")
+            raise OllamaError(
+                f"Model or endpoint missing. Check ollama list; if needed, run: ollama pull {self.settings.model}"
+            )
         if response.status_code == 400:
-            raise OllamaError("Ollama rejected the request. Use an up-to-date Ollama and a model supporting think:false, such as qwen3:8b.")
+            raise OllamaError(
+                "Ollama rejected the request. Use an up-to-date Ollama and a model supporting think:false, such as qwen3:8b."
+            )
         if response.status_code != 200:
-            raise OllamaError(f"Ollama returned HTTP {response.status_code}. Check the local Ollama application.")
+            raise OllamaError(
+                f"Ollama returned HTTP {response.status_code}. Check the local Ollama application."
+            )
 
     async def check(self) -> str:
         try:
@@ -50,19 +58,28 @@ class OllamaClient:
                 names = {model["name"] for model in models}
                 wanted = self.settings.model
                 if wanted not in names and f"{wanted}:latest" not in names:
-                    raise OllamaError(f"Ollama reachable; model missing. Run explicitly: ollama pull {wanted}")
+                    raise OllamaError(
+                        f"Ollama reachable; model missing. Run explicitly: ollama pull {wanted}"
+                    )
                 return f"Local Ollama reachable · {wanted} installed (checked now)"
         except httpx.TimeoutException as exc:
             raise OllamaError("Ollama check timed out. Check the local server and retry.") from exc
         except httpx.RequestError as exc:
-            raise OllamaError("Cannot reach local Ollama. Start Ollama from Start, or run ollama serve, then Check connection.") from exc
+            raise OllamaError(
+                "Cannot reach local Ollama. Start Ollama from Start, or run ollama serve, then Check connection."
+            ) from exc
         except (ValueError, KeyError, TypeError) as exc:
-            raise OllamaError("Ollama returned an invalid model list. Check its version and URL.") from exc
+            raise OllamaError(
+                "Ollama returned an invalid model list. Check its version and URL."
+            ) from exc
 
     async def chat(self, messages: list[dict], progress: Callable[[], None] | None = None) -> str:
         payload = {
-            "model": self.settings.model, "messages": messages, "stream": True,
-            "think": False, "keep_alive": "5m",
+            "model": self.settings.model,
+            "messages": messages,
+            "stream": True,
+            "think": False,
+            "keep_alive": "5m",
             "options": {"num_ctx": self.settings.context_size, "num_predict": 768},
         }
         parts: list[str] = []
@@ -78,7 +95,9 @@ class OllamaClient:
                         async for chunk in response.aiter_bytes():
                             wire_size += len(chunk)
                             if wire_size > 1_000_000:
-                                raise OllamaError("Ollama response exceeded the safety limit. Try a shorter request.")
+                                raise OllamaError(
+                                    "Ollama response exceeded the safety limit. Try a shorter request."
+                                )
                             buffer += chunk
                             if len(buffer) > 128_000:
                                 raise OllamaError("Ollama returned an oversized response frame.")
@@ -88,7 +107,9 @@ class OllamaClient:
                                     continue
                                 event = json.loads(line)
                                 if not isinstance(event, dict) or "error" in event:
-                                    raise OllamaError("Ollama interrupted generation. Check the model and available memory.")
+                                    raise OllamaError(
+                                        "Ollama interrupted generation. Check the model and available memory."
+                                    )
                                 message = event.get("message", {})
                                 content = message.get("content", "")
                                 if not isinstance(content, str):
@@ -96,7 +117,9 @@ class OllamaClient:
                                 parts.append(content)
                                 total += len(content)
                                 if total > 32000:
-                                    raise OllamaError("Answer exceeded 32,000 characters. Ask for a shorter answer.")
+                                    raise OllamaError(
+                                        "Answer exceeded 32,000 characters. Ask for a shorter answer."
+                                    )
                                 if progress:
                                     progress()
                                 if event.get("done") is True:
@@ -104,14 +127,24 @@ class OllamaClient:
                             if done:
                                 break
                         if not done:
-                            raise OllamaError("Ollama stream ended before completion. Please retry.")
+                            raise OllamaError(
+                                "Ollama stream ended before completion. Please retry."
+                            )
         except (httpx.TimeoutException, TimeoutError) as exc:
-            raise OllamaError("Generation timed out (90s silence / 180s total). Try a shorter prompt or check Ollama.") from exc
+            raise OllamaError(
+                "Generation timed out (90s silence / 180s total). Try a shorter prompt or check Ollama."
+            ) from exc
         except httpx.RequestError as exc:
-            raise OllamaError("Connection to local Ollama failed or was interrupted. Start Ollama and retry.") from exc
+            raise OllamaError(
+                "Connection to local Ollama failed or was interrupted. Start Ollama and retry."
+            ) from exc
         except (ValueError, TypeError, AttributeError) as exc:
-            raise OllamaError("Ollama returned malformed chat data. Check its version and retry.") from exc
+            raise OllamaError(
+                "Ollama returned malformed chat data. Check its version and retry."
+            ) from exc
         answer = final_answer("".join(parts))
         if not answer:
-            raise OllamaError("The model returned no final answer. Use qwen3:8b with current Ollama and try again.")
+            raise OllamaError(
+                "The model returned no final answer. Use qwen3:8b with current Ollama and try again."
+            )
         return answer

@@ -13,7 +13,9 @@ def build_context(profile: CharacterProfile, messages: list[dict], context_size:
         cost = len(message["content"].encode("utf-8")) + 16
         if cost > budget:
             if not selected:
-                raise ValueError("This message is too long for the selected context. Shorten it or increase context in Settings.")
+                raise ValueError(
+                    "This message is too long for the selected context. Shorten it or increase context in Settings."
+                )
             break
         selected.append({"role": message["role"], "content": message["content"]})
         budget -= cost
