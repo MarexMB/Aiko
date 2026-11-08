@@ -1,0 +1,7 @@
+{
+  "model": "qwen3:8b",
+  "ollama_url": "http://127.0.0.1:11434",
+  "context_size": 4096,
+  "always_on_top": true,
+  "reduced_motion": false
+}
