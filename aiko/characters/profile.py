@@ -21,7 +21,7 @@ class CharacterProfile:
                 raise ValueError("Character text fields must be nonempty strings.")
         if not re.fullmatch(r"[a-z0-9_-]+", profile.id):
             raise ValueError("Character ID must be a stable lowercase identifier.")
-        for key in ("hair", "accent", "dress", "skin"):
+        for key in ("hair", "eyes", "accent", "dress", "skin"):
             if not re.fullmatch(r"#[0-9a-fA-F]{6}", profile.appearance.get(key, "")):
                 raise ValueError(f"Invalid character color: {key}")
         for key, low, high in (("bounce_px", 0, 8), ("blink_seconds", 2, 12)):

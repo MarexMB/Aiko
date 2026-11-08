@@ -1,10 +1,10 @@
-"""Original QPainter character renderer. Replace this widget for future renderers."""
+"""Original pixel-art renderer on a 40×50 grid, scaled without smoothing."""
 
 import math
 import time
 
-from PySide6.QtCore import QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
+from PySide6.QtCore import QPoint, QRect, Qt, QTimer
+from PySide6.QtGui import QColor, QImage, QPainter, QPolygon
 from PySide6.QtWidgets import QWidget
 
 from aiko.characters.profile import CharacterProfile
@@ -19,7 +19,7 @@ class MascotWidget(QWidget):
         self.started = time.monotonic()
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.timer = QTimer(self)
-        self.timer.setInterval(80)  # 12.5 fps, small vector drawing, no GPU animation engine.
+        self.timer.setInterval(80)
         self.timer.timeout.connect(self.update)
         self.timer.start()
         self.happy_timer = QTimer(self)
@@ -42,107 +42,296 @@ class MascotWidget(QWidget):
         self.update()
 
     def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.scale(self.width() / 200, self.height() / 250)
         elapsed = time.monotonic() - self.started
-        motion = 0 if self.reduced_motion else math.sin(elapsed * 1.8)
         colors = self.profile.appearance
-        outline = QColor("#30243e")
+        image = QImage(40, 50, QImage.Format.Format_ARGB32_Premultiplied)
+        image.fill(Qt.GlobalColor.transparent)
+        sprite = QPainter(image)
+        sprite.setPen(Qt.PenStyle.NoPen)
+        outline = "#302c47"
+        hair = colors["hair"]
+        shadow = QColor(hair).darker(125).name()
+        highlight = QColor(hair).lighter(125).name()
 
-        def ellipse(x, y, w, h, color):
-            p.setBrush(QColor(color))
-            p.drawEllipse(QRectF(x, y, w, h))
+        def box(x, y, w, h, color):
+            sprite.fillRect(x, y, w, h, QColor(color))
 
-        def path(points, color):
-            shape = QPainterPath()
-            shape.moveTo(*points[0])
-            for point in points[1:]:
-                shape.lineTo(*point)
-            shape.closeSubpath()
-            p.setBrush(QColor(color))
-            p.drawPath(shape)
+        def shape(points, color):
+            sprite.setBrush(QColor(color))
+            sprite.drawPolygon(QPolygon([QPoint(x, y) for x, y in points]))
 
-        p.setPen(Qt.PenStyle.NoPen)
-        ellipse(44, 230, 112, 12, "#30303d")
-        p.translate(0, motion * self.profile.animation["bounce_px"])
-        p.setPen(QPen(outline, 2.4))
-        # Hair silhouette and two soft side locks.
-        ellipse(39, 33, 122, 151, colors["hair"])
-        ellipse(26, 71, 37, 112, colors["hair"])
-        ellipse(137, 71, 37, 112, colors["hair"])
-        # Boots, stockings, dress, sleeves.
-        ellipse(69, 194, 24, 38, "#eee4fb")
-        ellipse(107, 194, 24, 38, "#eee4fb")
-        ellipse(63, 221, 32, 15, colors["dress"])
-        ellipse(105, 221, 32, 15, colors["dress"])
-        path([(73, 141), (127, 141), (145, 203), (55, 203)], colors["dress"])
-        path([(75, 144), (57, 148), (44, 181), (62, 188), (84, 164)], colors["accent"])
-        path([(125, 144), (143, 148), (156, 181), (138, 188), (116, 164)], colors["accent"])
-        ellipse(44, 176, 18, 22, colors["skin"])
-        ellipse(138, 176, 18, 22, colors["skin"])
-        path(
-            [(79, 147), (100, 160), (121, 147), (115, 171), (100, 163), (85, 171)], colors["accent"]
-        )
-        ellipse(95, 158, 10, 12, "#f5d689")
-        p.setPen(QPen(QColor(colors["accent"]), 3))
-        p.drawLine(65, 196, 135, 196)
-        # A slight head tilt is purely cosmetic.
-        p.translate(100, 102)
-        p.rotate(motion * 1.5)
-        p.translate(-100, -102)
-        p.setPen(QPen(outline, 2.4))
-        ellipse(49, 58, 102, 91, colors["skin"])
-        # Swept bangs.
-        path(
+        box(10, 47, 20, 1, "#343246")
+        # Snap movement to the sprite grid; fractional transforms blur pixel edges.
+        bounce = 0
+        if not self.reduced_motion:
+            bounce = round(math.sin(elapsed * 1.8) * self.profile.animation["bounce_px"] / 5)
+        sprite.translate(0, bounce)
+
+        # Stepped hair silhouette and long side locks.
+        shape(
             [
-                (44, 86),
-                (46, 60),
-                (66, 39),
-                (111, 34),
-                (146, 57),
-                (154, 92),
-                (130, 79),
-                (114, 55),
-                (108, 86),
-                (90, 65),
-                (76, 89),
-                (70, 65),
-                (59, 91),
+                (13, 6),
+                (26, 6),
+                (26, 7),
+                (29, 7),
+                (29, 9),
+                (31, 9),
+                (31, 13),
+                (33, 13),
+                (33, 30),
+                (31, 30),
+                (31, 34),
+                (26, 34),
+                (26, 30),
+                (13, 30),
+                (13, 34),
+                (8, 34),
+                (8, 30),
+                (6, 30),
+                (6, 14),
+                (8, 14),
+                (8, 10),
+                (10, 10),
+                (10, 8),
+                (13, 8),
             ],
-            colors["hair"],
+            outline,
         )
+        shape(
+            [
+                (13, 7),
+                (25, 7),
+                (25, 8),
+                (28, 8),
+                (28, 10),
+                (30, 10),
+                (30, 15),
+                (32, 15),
+                (32, 29),
+                (30, 29),
+                (30, 33),
+                (27, 33),
+                (27, 28),
+                (12, 28),
+                (12, 33),
+                (9, 33),
+                (9, 29),
+                (7, 29),
+                (7, 15),
+                (9, 15),
+                (9, 11),
+                (11, 11),
+                (11, 9),
+                (13, 9),
+            ],
+            hair,
+        )
+        box(8, 19, 2, 11, shadow)
+        box(29, 18, 2, 13, shadow)
+        box(10, 13, 1, 17, highlight)
+        box(31, 17, 1, 9, highlight)
+
+        # Stockings and square-toed ankle boots.
+        box(14, 39, 5, 7, outline)
+        box(22, 39, 5, 7, outline)
+        box(15, 40, 3, 5, "#f3edff")
+        box(23, 40, 3, 5, "#f3edff")
+        box(13, 45, 6, 2, outline)
+        box(22, 45, 6, 2, outline)
+        box(14, 45, 4, 1, colors["accent"])
+        box(23, 45, 4, 1, colors["accent"])
+
+        # Violet dress, puff sleeves, tiny hands and pleated hem.
+        shape(
+            [
+                (15, 28),
+                (24, 28),
+                (24, 30),
+                (27, 30),
+                (27, 35),
+                (29, 35),
+                (29, 40),
+                (10, 40),
+                (10, 36),
+                (12, 36),
+                (12, 30),
+                (15, 30),
+            ],
+            outline,
+        )
+        shape(
+            [
+                (15, 29),
+                (24, 29),
+                (24, 34),
+                (26, 34),
+                (26, 38),
+                (28, 38),
+                (28, 39),
+                (11, 39),
+                (11, 37),
+                (13, 37),
+                (13, 34),
+                (15, 34),
+            ],
+            colors["dress"],
+        )
+        box(12, 31, 3, 5, colors["accent"])
+        box(25, 31, 3, 5, colors["accent"])
+        box(10, 35, 4, 4, outline)
+        box(27, 35, 4, 4, outline)
+        box(11, 35, 2, 3, colors["skin"])
+        box(28, 35, 2, 3, colors["skin"])
+        box(14, 37, 1, 2, colors["accent"])
+        box(19, 35, 1, 4, colors["accent"])
+        box(24, 37, 1, 2, colors["accent"])
+        box(12, 39, 16, 1, "#e8dcff")
+        shape([(15, 29), (19, 31), (24, 29), (23, 32), (20, 33), (17, 32)], "#fff5e9")
+        box(18, 32, 4, 2, "#66b9f4")
+        box(19, 32, 2, 1, "#d1f1ff")
+
+        # Face and stepped fringe.
+        shape(
+            [
+                (12, 15),
+                (27, 15),
+                (27, 25),
+                (25, 25),
+                (25, 27),
+                (23, 27),
+                (23, 28),
+                (16, 28),
+                (16, 27),
+                (13, 27),
+                (13, 25),
+                (11, 25),
+                (11, 17),
+            ],
+            outline,
+        )
+        shape(
+            [
+                (13, 15),
+                (26, 15),
+                (26, 24),
+                (24, 24),
+                (24, 26),
+                (22, 26),
+                (22, 27),
+                (17, 27),
+                (17, 26),
+                (14, 26),
+                (14, 24),
+                (12, 24),
+                (12, 17),
+            ],
+            colors["skin"],
+        )
+        shape(
+            [
+                (11, 13),
+                (13, 10),
+                (25, 10),
+                (28, 13),
+                (28, 19),
+                (26, 19),
+                (26, 17),
+                (23, 17),
+                (23, 14),
+                (21, 14),
+                (21, 18),
+                (19, 18),
+                (19, 16),
+                (17, 16),
+                (17, 14),
+                (16, 14),
+                (16, 18),
+                (13, 18),
+                (13, 20),
+                (11, 20),
+            ],
+            shadow,
+        )
+        shape(
+            [
+                (11, 12),
+                (13, 9),
+                (25, 9),
+                (28, 12),
+                (28, 17),
+                (26, 17),
+                (26, 15),
+                (23, 15),
+                (23, 12),
+                (21, 12),
+                (21, 16),
+                (19, 16),
+                (19, 14),
+                (17, 14),
+                (17, 12),
+                (16, 12),
+                (16, 16),
+                (13, 16),
+                (13, 18),
+                (11, 18),
+            ],
+            hair,
+        )
+        box(14, 9, 10, 1, highlight)
+        box(12, 11, 5, 1, highlight)
+        box(23, 11, 3, 1, highlight)
+
         blink = not self.reduced_motion and elapsed % self.profile.animation["blink_seconds"] < 0.16
-        p.setPen(QPen(outline, 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        if blink or self.state == "happy":
-            p.drawArc(QRectF(65, 99, 21, 14), 0, 180 * 16)
-            p.drawArc(QRectF(114, 99, 21, 14), 0, 180 * 16)
-        else:
-            ellipse(67, 96, 18, 25, "#615087")
-            ellipse(115, 96, 18, 25, "#615087")
-            p.setPen(Qt.PenStyle.NoPen)
-            ellipse(71, 98, 7, 9, "#ffffff")
-            ellipse(119, 98, 7, 9, "#ffffff")
-        p.setPen(Qt.PenStyle.NoPen)
-        ellipse(57, 119, 18, 8, "#f2b2c2")
-        ellipse(125, 119, 18, 8, "#f2b2c2")
-        p.setPen(QPen(outline, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        p.drawArc(QRectF(91, 120, 18, 13), 180 * 16, 180 * 16)
-        # Original five-point star hair pin.
-        star = []
-        for i in range(10):
-            angle = -math.pi / 2 + i * math.pi / 5
-            radius = 12 if i % 2 == 0 else 5
-            star.append((143 + math.cos(angle) * radius, 68 + math.sin(angle) * radius))
-        path(star, "#ffe2a1")
+        for x in (14, 23):
+            if self.state == "happy":
+                box(x, 20, 3, 1, outline)
+                box(x - 1, 21, 1, 1, outline)
+                box(x + 3, 21, 1, 1, outline)
+            elif blink:
+                box(x, 22, 3, 1, outline)
+            else:
+                box(x, 19, 3, 1, outline)
+                box(x, 20, 3, 4, colors["eyes"])
+                box(x, 20, 1, 2, "#ffffff")
+                box(x + 1, 20, 1, 2, "#174d89")
+                box(x + 1, 23, 2, 1, "#78d9ff")
+        box(12, 24, 3, 1, "#ed9ea9")
+        box(25, 24, 2, 1, "#ed9ea9")
+        box(19, 25, 2, 1, "#aa646e")
+
+        # Blue pixel star: a small accent against the yellow hair.
+        shape(
+            [
+                (28, 11),
+                (29, 13),
+                (31, 13),
+                (30, 15),
+                (30, 17),
+                (28, 16),
+                (26, 17),
+                (26, 15),
+                (25, 13),
+                (27, 13),
+            ],
+            outline,
+        )
+        box(28, 12, 1, 4, "#75d1ff")
+        box(26, 14, 5, 1, "#75d1ff")
+        box(28, 13, 1, 1, "#ffffff")
         if self.state == "thinking":
-            p.setPen(Qt.PenStyle.NoPen)
             for i in range(3):
-                ellipse(
-                    80 + i * 16,
-                    17 + (0 if self.reduced_motion else math.sin(elapsed * 4 + i) * 2),
-                    8,
-                    8,
-                    colors["accent"],
-                )
+                offset = 0 if self.reduced_motion else round(math.sin(elapsed * 4 + i))
+                box(15 + i * 4, 2 + offset, 2, 2, colors["accent"])
+        sprite.end()
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
+        scale = max(1, min(self.width() // 40, self.height() // 50))
+        target = QRect(
+            (self.width() - 40 * scale) // 2,
+            (self.height() - 50 * scale) // 2,
+            40 * scale,
+            50 * scale,
+        )
+        p.drawImage(target, image)
         p.end()

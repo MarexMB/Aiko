@@ -1,6 +1,6 @@
 # Aiko
 
-An original, local-first desktop AI companion for Windows 11: a small violet-haired
+An original, local-first desktop AI companion for Windows 11: a yellow-haired, blue-eyed pixel-art
 Qt mascot with a compact chat window powered by your installed Ollama model.
 No accounts, API keys, subscriptions, telemetry, or cloud fallback.
 
@@ -10,7 +10,7 @@ shell execution, browsing, or autonomous agent infrastructure. Model output is i
 ## Features
 
 - Transparent, draggable, borderless mascot; click to chat, right-click for menu.
-- Idle bounce/tilt/blink, thinking dots, happy expression; reduced motion stops its animation timer.
+- Idle pixel-step bounce/blink, thinking dots, happy expression; reduced motion stops its animation timer.
 - Saved position clamped to actual available screens after monitor changes.
 - Dark chat with violet accents; Enter sends, Shift+Enter inserts a newline.
 - Background inference, Stop, one request at a time, actionable connection errors.
@@ -137,7 +137,7 @@ Edit [aiko/characters/aiko.json](aiko/characters/aiko.json) and restart to chang
 | `id` | Stable lowercase ID, currently `aiko`; history is associated with it |
 | `display_name`, `description` | Character metadata |
 | `system_prompt` | Personality, Serbian/English behavior, honest capability limits |
-| `appearance` | `hair`, `accent`, `dress`, `skin`, each a six-digit hex color |
+| `appearance` | `hair`, `eyes`, `accent`, `dress`, `skin`, each a six-digit hex color |
 | `animation` | `bounce_px` (0–8), `blink_seconds` (2–12) |
 
 `CharacterManager` exposes only Aiko. Future profiles/renderers can use this boundary without
@@ -169,7 +169,7 @@ Character JSON → CharacterManager → Controller → MascotWindow → QPainter
 - `aiko/characters/`: profile schema, loader, one original character.
 - `aiko/ai/`: context budget and local HTTP client, independent of Qt widgets.
 - `aiko/memory/`: parameterized SQL, sessions/messages/preferences, cascading deletion.
-- `aiko/ui/`: views, vector art, placement, settings, worker signals.
+- `aiko/ui/`: views, original pixel art, placement, settings, worker signals.
 - `tests/`: deterministic tests plus opt-in live Ollama integration.
 
 SQLite connections never cross threads. Workers receive copies and immutable settings.
@@ -264,7 +264,7 @@ The launched app process responded. The Windows inspection helper was unavailabl
 desktop transparency, cross-monitor drag, focus, mixed DPI, and idle resource usage still
 require manual QA. No numeric idle CPU/GPU claim is made.
 
-This is a vector mascot, not a rigged engine. No Markdown renderer, executable links, encrypted
+This is a pixel-art mascot, not a rigged engine. No Markdown renderer, executable links, encrypted
 storage, summarization, retry button, token counter, installer, or single-instance enforcement.
 Keep one Aiko process open. Linux and Python 3.13 have not been tested in this environment.
 

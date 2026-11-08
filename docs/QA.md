@@ -25,7 +25,7 @@ and session reset. No successful live desktop inspection is claimed.
 
 1. Launch Aiko. Confirm transparent silhouette, no border/background on the actual desktop.
 2. Click to toggle chat. Drag without opening chat. Right-click Open Chat / Settings / Quit.
-3. Type in another app: idle Aiko must not steal focus. Observe blink/tilt/bounce and
+3. Type in another app: idle Aiko must not steal focus. Observe blink/pixel-step bounce and
    thinking/happy transitions during a real response.
 4. Drag across monitors, quit, relaunch. Disconnect a monitor and verify recovery.
    Repeat at 100%, 150%, 200%, and mixed display scaling.
